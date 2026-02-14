@@ -1,24 +1,18 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
+import react from "@vitejs/plugin-react";
 import path from "path";
-import { viteSourceLocator } from "@metagptx/vite-plugin-source-locator";
-import { atoms } from "@metagptx/web-sdk/plugins";
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  plugins: [
-    viteSourceLocator({
-      prefix: "mgx",
-    }),
-    react(),
-    atoms(),
-  ],
-  server: {
-    watch: { usePolling: true, interval: 800 /* 300~1500 */ },
-  },
+export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+      "@": path.resolve(__dirname, "src")  // <- this fixes the `@` imports
+    }
   },
-}));
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp"
+    }
+  }
+});
