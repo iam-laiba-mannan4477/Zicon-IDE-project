@@ -4,9 +4,9 @@ import Sidebar from "@/components/Sidebar";
 import EditorPanel from "@/components/EditorPanel";
 import PreviewPanel from "@/components/PreviewPanel";
 import Split from "react-split";
-import Editor from "@monaco-editor/react";
 import { WebContainer } from "@webcontainer/api";
 import { Terminal } from "xterm";
+import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 
 export default function Index() {
@@ -49,32 +49,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const updateFileContent = (filename: string, content: string) => {
     setFiles(prev => ({ ...prev, [filename]: content }));
+    codeRef.current = content; // sync with terminal
   };
 
-  // Terminal refs and state
+  // Terminal state & refs
   const [termReady, setTermReady] = useState(false);
+  const [terminalVisible, setTerminalVisible] = useState(true);
   const codeRef = useRef("// Hello StackBlitz!\nconsole.log('🚀 Zicon IDE');\n");
   const wcRef = useRef<WebContainer | null>(null);
   const termRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
   const terminalDivRef = useRef<HTMLDivElement>(null);
   const inputWriterRef = useRef<any>(null);
 
+  // Initialize terminal
   useEffect(() => {
     const initTerminal = async () => {
       const wc = await WebContainer.boot();
       wcRef.current = wc;
 
-      await wc.mount({
-        "index.js": { file: { contents: codeRef.current } }
-      });
+      await wc.mount({ "index.js": { file: { contents: codeRef.current } } });
 
       const term = new Terminal({
-        fontSize: 14,
+        fontSize: 12,
         cursorBlink: true,
-        theme: { background: "#0d1117", foreground: "#c9d1d9" }
+        theme: { background: "#0d1117", foreground: "#c9d1d9" },
+        scrollback: 1000
       });
 
+      const fitAddon = new FitAddon();
+      fitAddonRef.current = fitAddon;
+      term.loadAddon(fitAddon);
       term.open(terminalDivRef.current!);
+      fitAddon.fit();
+
       termRef.current = term;
 
       const sh = await wc.spawn("sh");
@@ -97,6 +105,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }, []);
 
+  // Fit terminal on resize
+  useEffect(() => {
+    if (!terminalDivRef.current) return;
+    const ro = new ResizeObserver(() => fitAddonRef.current?.fit());
+    ro.observe(terminalDivRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   const runTerminalCode = async () => {
     if (!wcRef.current || !termRef.current) return;
 
@@ -114,24 +130,31 @@ document.addEventListener('DOMContentLoaded', () => {
   return (
     <div className="h-screen flex flex-col bg-[#1E1E1E] text-[#CCCCCC] overflow-hidden">
       <TopBar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+
+      <Split
+        className="flex flex-col flex-1"
+        sizes={terminalVisible ? [70, 30] : [100, 0]}
+        minSize={[200, 0]}
+        gutterSize={6}
+        direction="vertical"
+        expandToMin={true}
+        onDragEnd={() => fitAddonRef.current?.fit()}
+      >
+        {/* Editor + Sidebar + Preview */}
         <div className="flex flex-1 overflow-hidden">
           <Sidebar files={files} activeFile={activeFile} onFileSelect={setActiveFile} />
           <EditorPanel 
             activeFile={activeFile} 
             content={files[activeFile] || ""} 
-            onContentChange={(content) => {
-              updateFileContent(activeFile, content);
-              codeRef.current = content; // sync editor content to terminal
-            }} 
+            onContentChange={(content) => updateFileContent(activeFile, content)} 
           />
           <PreviewPanel files={files} />
         </div>
 
         {/* Terminal */}
-        <div className="flex-1 min-h-[180px]">
-          <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center bg-[#161b22] px-2 py-1 border-b border-[#30363d] text-xs text-[#c9d1d9]">
+        <div className="flex flex-col h-full border-t border-[#30363d]">
+          <div className="flex justify-between items-center bg-[#161b22] px-2 py-1 text-xs text-[#c9d1d9] border-b border-[#30363d]">
+            <div className="flex items-center gap-2">
               <span>Terminal {termReady ? "●" : "Loading..."}</span>
               <button
                 onClick={runTerminalCode}
@@ -141,10 +164,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 Run
               </button>
             </div>
-            <div ref={terminalDivRef} className="flex-1 h-full p-2" />
+            <button
+              onClick={() => setTerminalVisible(!terminalVisible)}
+              className="bg-[#21262d] px-2 py-1 text-xs rounded hover:bg-[#30363d]"
+            >
+              {terminalVisible ? "Hide" : "Show"}
+            </button>
           </div>
+          <div
+            ref={terminalDivRef}
+            className="flex-1 h-full p-2 text-[11px]"
+          />
         </div>
-      </div>
+      </Split>
     </div>
   );
 }
+
