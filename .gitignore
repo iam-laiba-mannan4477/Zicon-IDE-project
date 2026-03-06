@@ -1,0 +1,9 @@
+# Node modules
+node_modules/
+.pnpm-store/
+
+# Temporary IDE/workspace files
+workspace/
+
+# Logs
+*.log

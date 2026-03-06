@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  zicon-terminal:
+    build: .
+    container_name: zicon-terminal
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/workspace
+    ports:
+      - "5001:5000"
+    tty: true
+    stdin_open: true
